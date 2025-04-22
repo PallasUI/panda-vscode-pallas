@@ -280,10 +280,9 @@ export class RecipeParser {
         // Handle nested objects
         if (Node.isObjectLiteralExpression(initializer)) {
           const nestedProps = this.extractProperties(initializer);
-          
           // Prefix the nested property names with the parent property name
           return nestedProps.map(nestedProp => ({
-            propName: `${propName}.${nestedProp.propName}`,
+            propName: `${nestedProp.propName}`,
             propValue: nestedProp.propValue,
             range: nestedProp.range
           }));

@@ -82,6 +82,7 @@ function createHints(
  */
 function isValidTokenForHint(token: Token): boolean {
   return token.extensions.kind !== 'color' &&
+         token.type !== 'color' &&
          token.extensions.kind !== 'semantic-color' &&
          token.extensions.kind !== 'native-color' &&
          token.extensions.kind !== 'invalid-token-path'
