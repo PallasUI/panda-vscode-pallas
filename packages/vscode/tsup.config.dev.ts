@@ -8,19 +8,18 @@ const aliases = {
 
 const nodeModulesPath = path.resolve(__dirname, 'node_modules')
 
-
-
 export default defineConfig([
   // Extension entry point
   {
     entry: ['src/index.ts'],
     format: ['cjs'],
     external: ['vscode', 'esbuild', 'lightningcss'],
-    minify: true,
+    minify: false,
     outDir: 'dist',
-    clean: true,
+    clean: false,
     shims: true,
     sourcemap: true,
+    watch: true,
     esbuildOptions(options) {
       options.target = 'es2020'
     },
@@ -47,10 +46,10 @@ export default defineConfig([
     entry: ['src/server.ts'],
     format: ['cjs'],
     external: ['vscode', 'esbuild', 'lightningcss'],
-    minify: true,
+    minify: false,
     outDir: 'dist',
     shims: true,
     sourcemap: true,
-    
+    watch: true,
   },
-])
+]) 

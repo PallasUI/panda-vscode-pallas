@@ -100,7 +100,7 @@
         },
         "panda.diagnostics.enabled": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "title": "Diagnostics",
           "description": "Enable all diagnostics"
         },
@@ -149,7 +149,7 @@
         },
         "panda.hovers.semantic-colors.enabled": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "title": "Semantic Colors hover preview",
           "description": "Enable semantic colors preview on hover"
         },
@@ -178,7 +178,7 @@
         },
         "panda.debug.enabled": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "title": "Debug",
           "description": "Enable debug logs"
         }
@@ -197,51 +197,72 @@
   },
   "scripts": {
     "build:all": "yarn workspaces foreach -R run build",
-    "build": "tsup",
-    "dev": "tsup --watch src/index.ts --watch ../language-server/dist/index.js --watch ../shared/dist/index.js --watch ../ts-plugin/dist/index.js",
+    "build": "NODE_OPTIONS='--no-warnings' tsup",
+    "dev": "NODE_OPTIONS='--no-warnings' tsup --watch --sourcemap src/index.ts --watch --sourcemap src/server.ts --watch ../shared/dist/index.js --watch ../ts-plugin/dist/index.js",
+    "dev:watch": "NODE_OPTIONS='--no-warnings' tsup --config tsup.config.dev.ts",
     "clean": "rimraf dist node_modules",
     "typecheck": "tsc --noEmit",
-    "release": "yarn build --silent && tsx ./scripts/publish.ts",
+    "release": "NODE_OPTIONS='--no-warnings' yarn build --silent && tsx ./scripts/publish.ts",
     "pkg": "yarn vsix-builder package"
   },
   "dependencies": {
-    "@pandacss/dev": "^0.37.2",
-    "@pandacss/preset-base": "^0.37.2",
-    "@pandacss/preset-panda": "^0.37.2",
+    "@pandacss/core": "^0.53.4",
+    "@pandacss/dev": "^0.53.4",
+    "@pandacss/extractor": "^0.53.4",
+    "@pandacss/generator": "^0.53.4",
+    "@pandacss/node": "^0.53.4",
+    "@pandacss/parser": "^0.53.4",
+    "@pandacss/preset-base": "^0.53.4",
+    "@pandacss/preset-panda": "^0.53.4",
+    "@pandacss/shared": "^0.53.4",
+    "@pandacss/token-dictionary": "^0.53.4",
     "@pandacss/ts-plugin": "workspace:^",
     "esbuild": "^0.20.2",
+    "fast-glob": "^3.3.2",
     "pathe": "1.1.2"
   },
   "bundledDependencies": [
-    "@pandacss/ts-plugin",
-    "@pandacss/dev",
-    "@pandacss/preset-base",
-    "@pandacss/preset-panda",
     "pathe",
     "esbuild"
   ],
   "devDependencies": {
     "@pandacss/extension-shared": "workspace:^",
     "@pandacss/language-server": "workspace:^",
-    "@pandacss/types": "^0.37.2",
+    "@pandacss/types": "^0.53.4",
     "@pandacss/vsix-builder": "workspace:^",
     "@pnpm/find-workspace-dir": "^6.0.3",
     "@pnpm/find-workspace-packages": "^6.0.9",
     "@pnpm/types": "^9.4.2",
+    "@types/base-64": "^1.0.2",
     "@types/node": "20.11.30",
+    "@types/prettier": "3.0.0",
     "@types/semver": "^7.5.8",
+    "@types/utf8": "^3.0.3",
     "@types/vscode": "^1.87.0",
     "@vscode/vsce": "^2.24.0",
     "@vue/compiler-sfc": "^3.4.21",
+    "base-64": "^1.0.0",
+    "color2k": "^2.0.3",
     "dotenv": "^16.4.5",
     "execa": "8.0.1",
     "fs-extra": "11.2.0",
     "lightningcss-wasm": "^1.24.1",
+    "lil-fp": "1.4.5",
+    "postcss": "^8.4.36",
+    "prettier": "^3.2.5",
+    "satori": "^0.10.13",
     "semver": "^7.6.0",
+    "ts-morph": "21.0.1",
+    "ts-pattern": "5.0.8",
     "tsup": "8.0.2",
     "tsx": "^4.7.1",
     "typescript": "^5.4.2",
+    "utf8": "^3.0.0",
+    "vitest": "^1.4.0",
     "vscode": "^1.1.37",
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-uri": "^3.0.8"
   }
 }

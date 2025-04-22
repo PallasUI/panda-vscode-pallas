@@ -77,6 +77,7 @@ export class PandaExtension {
     const clientOptions: LanguageClientOptions = {
       documentSelector: docSelector as string[],
       diagnosticCollectionName: 'panda',
+      
       synchronize: {
         fileEvents: [vscode.workspace.createFileSystemWatcher('**/*/panda.config.{ts,js,cjs,mjs}')],
       },

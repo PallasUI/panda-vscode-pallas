@@ -7,7 +7,7 @@ const card = sva({
   slots: ['label', 'icon'],
   base: {
     label: {
-      color: 'red.200',
+      color: 'red.100',
     },
     icon: {
       fontSize: '3xl',

@@ -21,7 +21,12 @@ const getColorExtensions = (value: string, kind: string) => {
 }
 
 export const getTokenFromPropValue = (ctx: PandaContext, prop: string, value: string): Token | undefined => {
-  const utility = ctx.config.utilities?.[prop]
+  let utility = ctx.config.utilities?.[prop]
+  // if cant find utility try matching the shorthand property of the utility
+  if (!utility) {
+    const shorthand = ctx.utility.resolveShorthand(prop)
+    utility = ctx.config.utilities?.[shorthand]
+  }
 
   const potentialCategories: string[] = []
 
@@ -41,6 +46,7 @@ export const getTokenFromPropValue = (ctx: PandaContext, prop: string, value: st
   // Attempt to locate a token
   const matchedToken = potentialCategories
     .map((category) => {
+      
       return [category, value].join('.')
     })
     .map((tokenPath) => {
@@ -90,7 +96,7 @@ export const getTokenFromPropValue = (ctx: PandaContext, prop: string, value: st
       if (!first) return
 
       if (isColor(first.value)) {
-        const extensions = getColorExtensions(first.value, 'semantic-color')
+        const extensions = getColorExtensions(first.originalValue, 'semantic-color')
         if (!extensions) return
 
         return first.setExtensions(extensions)

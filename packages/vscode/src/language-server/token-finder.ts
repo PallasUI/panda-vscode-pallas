@@ -121,7 +121,6 @@ export class TokenFinder {
         },
       )
       .otherwise(() => {
-        //
         return undefined
       })
   }
@@ -136,13 +135,17 @@ export class TokenFinder {
 
     return match(node)
       .when(
-        () => getFirstAncestorMatching(stack, Node.isPropertyAssignment),
+        () => {
+          const result = getFirstAncestorMatching(stack, Node.isPropertyAssignment);
+          return result;
+        },
         () => {
           const propAssignment = getFirstAncestorMatching(stack, Node.isPropertyAssignment)!
           const name = propAssignment.getName()
 
           const objectLiteral = getFirstAncestorMatching(stack, Node.isObjectLiteralExpression)!
-          const maybeBox = maybeBoxNode(objectLiteral, [], extractor.boxCtx, (args) => args.propName === name)
+          
+          const maybeBox = maybeBoxNode(objectLiteral as any, stack as any, extractor.boxCtx)
           if (!box.isMap(maybeBox)) return
 
           const propNode = maybeBox.value.get(name)
@@ -154,10 +157,12 @@ export class TokenFinder {
         },
       )
       .when(
-        () => getFirstAncestorMatching(stack, Node.isJsxAttribute),
+        () => {
+          const result = getFirstAncestorMatching(stack, Node.isJsxAttribute);
+          return result;
+        },
         () => {
           const attrNode = getFirstAncestorMatching(stack, Node.isJsxAttribute)!
-
           const nameNode = attrNode.getNameNode()
           const name = nameNode.getText()
 
@@ -170,7 +175,6 @@ export class TokenFinder {
         },
       )
       .otherwise(() => {
-        //
         return undefined
       })
   }
@@ -184,14 +188,14 @@ export class TokenFinder {
 
     const { node, stack } = match
 
-    return this.findClosestToken(node, stack, ({ propName, propNode }) => {
+    return this.findClosestToken(node, stack, ({ propName, propNode, shorthand }) => {
       if (box.isLiteral(propNode)) {
         const propValue = propNode.value
         const maybeToken = getTokenFromPropValue(ctx, propName, String(propValue))
         if (!maybeToken) return
 
         const range = nodeRangeToVsCodeRange(propNode.getRange())
-        return { kind: 'token', token: maybeToken, range, propName, propValue, propNode } as ClosestTokenMatch
+        return { kind: 'token', token: maybeToken, range, propName, propValue, propNode ,shorthand} as ClosestTokenMatch
       }
 
       if (box.isMap(propNode) && ctx.conditions.isCondition(propName)) {

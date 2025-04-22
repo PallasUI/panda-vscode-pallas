@@ -2,13 +2,13 @@ import * as vscode from 'vscode'
 import { LanguageClient } from 'vscode-languageclient/node'
 import { PandaExtension } from './panda-extension'
 
-const debug = false
+const debug = process.env.DEBUG === 'true'
 let client: LanguageClient | undefined
 
 export async function activate(context: vscode.ExtensionContext) {
   debug && console.log('activate')
 
-  const extension = new PandaExtension(context, debug)
+  const extension = new PandaExtension(context, true)
   await extension.connectToTsPlugin()
   await extension.start()
   client = extension.client

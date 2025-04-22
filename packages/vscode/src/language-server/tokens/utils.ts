@@ -70,6 +70,20 @@ export const getMarkdownCss = async (ctx: PandaContext, styles: SystemStyleObjec
 export const printTokenValue = (token: Token, settings: PandaVSCodeSettings) =>
   `${token.value}${settings['rem-to-px.enabled'] && token.value.endsWith('rem') ? ` (${toPx(token.value)})` : ''}`
 
+export const printTokenValueHover = (ctx: PandaContext, token: Token, settings: PandaVSCodeSettings) => {
+  let value = token.value
+  if (token.extensions?.conditions?.base) {
+    const [tokenRefBase] = ctx.tokens.getReferences(token.extensions.conditions.base)
+    const tokenRefOriginal = ctx.tokens.deepResolveReference(token.originalValue)
+    if (tokenRefBase) {
+      value = tokenRefBase.value
+    }
+    if (tokenRefOriginal) {
+      value = tokenRefOriginal
+    }
+  }
+  return `${value}${settings['rem-to-px.enabled'] && value.endsWith('rem') ? ` (${toPx(value)})` : ''}`
+}
 export const svgToMarkdownLink = (svg: string) => {
   const dataUri = 'data:image/svg+xml;charset=UTF-8;base64,' + base64.encode(utf8.encode(svg))
   return `![](${dataUri})`

@@ -1,4 +1,6 @@
 import { defineConfig } from '@pandacss/dev'
+import pandaPreset from '@pandacss/preset-panda'
+
 import { button} from "./src/button.recipe"
 
 export default defineConfig({
@@ -7,7 +9,7 @@ export default defineConfig({
 
   // Where to look for your css declarations
   include: ['./src/**/*.{js,jsx,ts,tsx}', './pages/**/*.{js,jsx,ts,tsx}'],
-
+  presets: [pandaPreset],
   // Files to exclude
   exclude: [],
 
@@ -25,7 +27,7 @@ export default defineConfig({
       semanticTokens: {
         colors: {
           danger: {
-            value: { base: '{colors.red.300}', _dark: '{colors.orange.300}' },
+            value: { base: '{colors.red.200}', _dark: '{colors.orange.300}' },
           },
           success: {
             value: { base: '{colors.green.300}', _dark: '{colors.lime.400}' },

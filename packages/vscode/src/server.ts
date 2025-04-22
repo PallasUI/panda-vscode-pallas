@@ -1,1 +1,1 @@
-import '@pandacss/language-server'
+import './language-server'

@@ -112,14 +112,55 @@ export class ProjectHelper {
 }
 
 const getDescendantAtPos = (from: Node, pos: number) => {
-  let node: Node | undefined = from
+  let node: Node = from
   const stack: Node[] = [from]
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const nextNode: Node | undefined = node.getChildAtPos(pos)
-    if (nextNode == null) return { node, stack }
-    else {
+    
+    // If we're at a leaf node or can't find a child at position
+    if (nextNode == null) {
+      // Try to find the most specific node at this position
+      const children: Node[] = node.getChildren();
+      const containingNodes: Node[] = children.filter((child: Node) => {
+        const start = child.getPos();
+        const end = child.getEnd();
+        return pos >= start && pos <= end;
+      });
+      
+      if (containingNodes.length > 0) {
+        // Sort by node length (smaller is more specific)
+        const sortedNodes: Node[] = containingNodes.sort((a: Node, b: Node) => 
+          (a.getEnd() - a.getPos()) - (b.getEnd() - b.getPos())
+        );
+        
+        
+        // Use the most specific (smallest) node that contains our position
+        if (sortedNodes[0] && sortedNodes[0] !== node) {
+          const mostSpecific = sortedNodes[0];
+          node = mostSpecific;
+          stack.push(node);
+          continue;
+        }
+      }
+      
+      // If we have a StringLiteral or NumericLiteral, ensure we're selecting it, not its parent
+      const propertyAssignment = node.getKindName() === 'PropertyAssignment' ? node : 
+                                 stack.find(n => n.getKindName() === 'PropertyAssignment');
+                                 
+      if (propertyAssignment && !stack.includes(propertyAssignment)) {
+        const initializer = propertyAssignment.getChildrenOfKind(ts.SyntaxKind.StringLiteral)[0] || 
+                            propertyAssignment.getChildrenOfKind(ts.SyntaxKind.NumericLiteral)[0];
+                            
+        if (initializer && pos >= initializer.getPos() && pos <= initializer.getEnd()) {
+          console.log('Found more precise literal node:', initializer.getKindName());
+          node = initializer;
+          stack.push(node);
+        }
+      }
+      return { node, stack }
+    } else {
       node = nextNode
       stack.push(node)
     }

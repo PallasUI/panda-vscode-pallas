@@ -1,5 +1,5 @@
-import { getMarkdownCss, nodeRangeToVsCodeRange, printTokenValue } from '../tokens/utils'
-import { renderTokenColorPreview } from '../tokens/render-token-color-preview'
+import { getMarkdownCss, nodeRangeToVsCodeRange, printTokenValueHover } from '../tokens/utils'
+import { renderTokenColorPreviewV2 } from '../tokens/render-token-color-preview'
 import { stringify } from '@pandacss/core'
 import { tryCatch } from 'lil-fp/func'
 import { onError } from '../tokens/error'
@@ -21,15 +21,16 @@ export function registerHover(lsp: PandaLanguageServer) {
       if (!doc) {
         return
       }
-
+      lsp.log(settings)
       if (settings['hovers.tokens.enabled']) {
         // TODO recipe
         const tokenMatch = lsp.tokenFinder.getClosestToken(doc, params.position)
+        lsp.log(tokenMatch)
         if (tokenMatch) {
           if (tokenMatch.kind === 'token') {
             const { token } = tokenMatch
 
-            const contents = [printTokenValue(token, settings)] as any[]
+            const contents = [printTokenValueHover(ctx, token, settings)] as any[]
             if (settings['hovers.tokens.css-preview.enabled']) {
               const css = (await getMarkdownCss(ctx, { [tokenMatch.propName]: token.value }, settings)).raw
               contents.push({ language: 'css', value: css })
@@ -38,7 +39,7 @@ export function registerHover(lsp: PandaLanguageServer) {
             const category = token.extensions.category
 
             if (category === 'colors' && settings['hovers.semantic-colors.enabled']) {
-              const preview = await renderTokenColorPreview(ctx, token)
+              const preview = renderTokenColorPreviewV2(ctx, token, tokenMatch.propName, tokenMatch.shorthand)
               if (preview) {
                 contents.push(preview)
               }

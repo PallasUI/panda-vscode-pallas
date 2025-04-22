@@ -18,10 +18,8 @@
         "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode",
         "--folder-uri=${workspaceRoot}/sandbox/vite"
       ],
-      "outFiles": ["${workspaceFolder}/packages/vscode/dist/**/*.js"],
-      "env": {
-        "TSS_DEBUG": "9559"
-      }
+      "outFiles": ["${workspaceFolder}/packages"],
+      "sourceMaps": true,
     },
     // See: https://github.com/microsoft/TypeScript/wiki/Debugging-Language-Service-in-VS-Code
     {
@@ -38,12 +36,34 @@
       "name": "Run Vitest",
       "request": "launch",
       "type": "node-terminal"
+    },
+    {
+      "name": "Debug Language Server",
+      "type": "node",
+      "request": "attach",
+      "port": 6099,
+      "restart": true,
+      "outFiles": [
+        "${workspaceFolder}/packages/vscode/dist/server.js",
+      ],
+      "sourceMaps": true,
+      "pauseForSourceMap": false,
+      "skipFiles": ["<node_internals>/**"]
     }
   ],
   "compounds": [
     {
       "name": "Launch Extension + TS Plugin",
       "configurations": ["Run Extension", "Attach to Server"]
+    },
+    {
+      "name": "Extension + Language Server",
+      "configurations": ["Run Extension", "Debug Language Server"],
+      "presentation": {
+        "hidden": false,
+        "group": "Debug",
+        "order": 1
+      }
     }
   ]
 }

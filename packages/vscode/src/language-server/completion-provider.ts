@@ -120,7 +120,7 @@ export const getCompletionFor = ({
   // also provide completion in string such as: token('colors.blue.300')
   if (settings['completions.token-fn.enabled'] && (hasTokenFnReference(str) || hasCurlyReference(str))) {
     const matches = getReferences(str)
-    const tokenPath = matches[0] ?? ''
+    const tokenPath = matches[2] ?? ''
     const split = tokenPath.split('.').filter(Boolean)
 
     // provide completion for token category when token() is empty or partial
@@ -210,9 +210,18 @@ export const getCompletionFor = ({
 
     const isColor = token.extensions.category === 'colors'
 
+    let insertText = name
+    if (str) {
+      const strEndsWithDot = str.endsWith('.')
+      if (strEndsWithDot) {
+        insertText = name.startsWith(str) ? name.substring(str.length) : name
+      }
+    }
+
     const completionItem = {
       data: { propName, token, shorthand },
       label: name,
+      insertText,
       kind: isColor ? CompletionItemKind.Color : CompletionItemKind.EnumMember,
       labelDetails: { description: printTokenValue(token, settings), detail: `   ${token.extensions.varRef}` },
       sortText: '-' + getSortText(name),

@@ -32,4 +32,5 @@ export function registerCompletion(lsp: PandaLanguageServer) {
     await lsp.completions.getCompletionDetails(item)
     return item
   })
+
 }

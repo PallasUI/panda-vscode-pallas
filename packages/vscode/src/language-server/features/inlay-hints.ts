@@ -22,7 +22,7 @@ export function registerInlayHints(lsp: PandaLanguageServer) {
       if (!doc) {
         return []
       }
-
+      
       const parserResult = lsp.project.parseSourceFile(doc)
       if (!parserResult) return
 
