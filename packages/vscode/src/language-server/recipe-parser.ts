@@ -7,6 +7,7 @@ export interface RecipeProperty {
   propName: string
   propValue: string
   range: Range
+  slot?: string
 }
 
 export interface RecipeVariant {
@@ -24,147 +25,226 @@ export interface RecipeDefinition {
   base: RecipeBase
   variants: Record<string, RecipeVariant[]>
   range: Range
+  slots?: string[]
 }
 
 export class RecipeParser {
   constructor(private getContext: () => PandaContext | undefined) {}
 
   parseSourceFile(sourceFile: SourceFile): RecipeDefinition[] {
-    const recipes: RecipeDefinition[] = []
+    // Find all defineRecipe and defineSlotRecipe call expressions
+    const recipeNodes = this.findRecipeNodes(sourceFile);
+    // Map nodes to recipe definitions
+    return recipeNodes.map(({node, isSlotRecipe}) => 
+      this.extractRecipeDefinition(node, isSlotRecipe)
+    ).filter((recipe): recipe is RecipeDefinition => !!recipe);
+  }
+  
+  private findRecipeNodes(sourceFile: SourceFile): {node: Node, isSlotRecipe: boolean}[] {
+    const recipeNodes: {node: Node, isSlotRecipe: boolean}[] = [];
     
-    // Directly search for all defineRecipe and defineSlotRecipe call expressions
     sourceFile.forEachDescendant(node => {
-      if (Node.isCallExpression(node)) {
-        const expression = node.getExpression()
-        if (Node.isIdentifier(expression)) {
-          const fnName = expression.getText()
-          
-          if (fnName === 'defineRecipe' || fnName === 'defineSlotRecipe') {
-            const recipe = this.extractRecipeDefinition(node, fnName === 'defineSlotRecipe')
-            if (recipe) {
-              recipes.push(recipe)
-            }
-          }
-        }
-      }
-    })
+      if (!Node.isCallExpression(node)) return;
+      
+      const expression = node.getExpression();
+      if (!Node.isIdentifier(expression)) return;
+      
+      const fnName = expression.getText();
+      if (fnName !== 'defineRecipe' && fnName !== 'defineSlotRecipe') return;
+      
+      recipeNodes.push({
+        node,
+        isSlotRecipe: fnName === 'defineSlotRecipe'
+      });
+    });
     
-    return recipes
+    return recipeNodes;
   }
   
   private extractRecipeDefinition(
     callExpression: Node, 
     isSlotRecipe: boolean
   ): RecipeDefinition | undefined {
-    if (!Node.isCallExpression(callExpression)) return undefined
+    if (!Node.isCallExpression(callExpression)) return undefined;
     
-    // Get the first argument (config object)
-    const args = callExpression.getArguments()
-    if (args.length === 0) return undefined
+    const configArg = this.getConfigArgument(callExpression);
+    if (!configArg) return undefined;
     
-    const configArg = args[0]
-    if (!Node.isObjectLiteralExpression(configArg)) return undefined
-    
-    // Get the recipe name - first try to find from parent variable declaration or export
-    let name = this.findRecipeNameFromParent(callExpression)
-    
-    // Find className property if present
-    const classNameProp = configArg.getProperty('className')
-    if (classNameProp && Node.isPropertyAssignment(classNameProp)) {
-      const initializer = classNameProp.getInitializer()
-      if (initializer && Node.isStringLiteral(initializer)) {
-        name = initializer.getLiteralValue()
-      }
-    }
-    
-    // Get the base styles
-    const base: RecipeBase = { properties: [] }
-    const baseProp = configArg.getProperty('base')
-    if (baseProp && Node.isPropertyAssignment(baseProp)) {
-      const initializer = baseProp.getInitializer()
-      if (initializer && Node.isObjectLiteralExpression(initializer)) {
-        base.properties = this.extractProperties(initializer)
-      }
-    }
-    
-    // Get the variants
-    const variants: Record<string, RecipeVariant[]> = {}
-    const variantsProp = configArg.getProperty('variants')
-    if (variantsProp && Node.isPropertyAssignment(variantsProp)) {
-      const initializer = variantsProp.getInitializer()
-      if (initializer && Node.isObjectLiteralExpression(initializer)) {
-        // Each property in variants is a variant group (like size, color, etc.)
-        initializer.getProperties().forEach(prop => {
-          if (Node.isPropertyAssignment(prop)) {
-            const variantGroupName = prop.getName()
-            const variantGroupValue = prop.getInitializer()
-            
-            if (variantGroupValue && Node.isObjectLiteralExpression(variantGroupValue)) {
-              // Each property in this object is a variant value (sm, md, lg, etc.)
-              const variantValues: RecipeVariant[] = []
-              
-              variantGroupValue.getProperties().forEach(variantProp => {
-                if (Node.isPropertyAssignment(variantProp)) {
-                  const variantName = variantProp.getName()
-                  const variantValue = variantProp.getInitializer()
-                  
-                  if (variantValue && Node.isObjectLiteralExpression(variantValue)) {
-                    variantValues.push({
-                      name: variantName,
-                      properties: this.extractProperties(variantValue)
-                    })
-                  }
-                }
-              })
-              
-              if (variantValues.length > 0) {
-                variants[variantGroupName] = variantValues
-              }
-            }
-          }
-        })
-      }
-    }
-    
-    // Create range from node position
-    const sourceFile = callExpression.getSourceFile();
-    const start = callExpression.getPos();
-    const end = callExpression.getEnd();
-    
-    const startLineAndChar = sourceFile.getLineAndColumnAtPos(start);
-    const endLineAndChar = sourceFile.getLineAndColumnAtPos(end);
-    
-    const range = Range.create(
-      { 
-        line: startLineAndChar.line - 1, 
-        character: startLineAndChar.column - 1
-      },
-      { 
-        line: endLineAndChar.line - 1, 
-        character: endLineAndChar.column - 1
-      }
-    );
+    // Extract all recipe components
+    const name = this.extractRecipeName(callExpression, configArg);
+    const slots = isSlotRecipe ? this.extractSlots(configArg) : [];
+    const base = this.extractBase(configArg, isSlotRecipe);
+    const variants = this.extractVariants(configArg, isSlotRecipe);
+    const range = this.createRangeFromNode(callExpression);
     
     return {
       type: isSlotRecipe ? 'slotRecipe' : 'recipe',
       name: name || 'unnamedRecipe',
       base,
       variants,
-      range
+      range,
+      slots: isSlotRecipe ? slots : undefined
+    };
+  }
+  
+  private getConfigArgument(callExpression: Node): Node | undefined {
+    if (!Node.isCallExpression(callExpression)) return undefined;
+    
+    const args = callExpression.getArguments();
+    if (args.length === 0) return undefined;
+    
+    const configArg = args[0];
+    return Node.isObjectLiteralExpression(configArg) ? configArg : undefined;
+  }
+  
+  private extractRecipeName(callExpression: Node, configArg: Node): string {
+    // Try to find name from parent variable declaration or export
+    const name = this.findRecipeNameFromParent(callExpression);
+    if (name) return name;
+    
+    // Try to find from className property
+    if (Node.isObjectLiteralExpression(configArg)) {
+      const classNameProp = configArg.getProperty('className');
+      if (classNameProp && Node.isPropertyAssignment(classNameProp)) {
+        const initializer = classNameProp.getInitializer();
+        if (initializer && Node.isStringLiteral(initializer)) {
+          return initializer.getLiteralValue();
+        }
+      }
     }
+    
+    return '';
+  }
+  
+  private extractSlots(configArg: Node): string[] {
+    if (!Node.isObjectLiteralExpression(configArg)) return [];
+    
+    const slotsProp = configArg.getProperty('slots');
+    if (!slotsProp || !Node.isPropertyAssignment(slotsProp)) return [];
+    
+    const initializer = slotsProp.getInitializer();
+    if (!initializer || !Node.isArrayLiteralExpression(initializer)) return [];
+    
+    return initializer.getElements()
+      .filter(Node.isStringLiteral)
+      .map(element => element.getLiteralValue());
+  }
+  
+  private extractBase(configArg: Node, isSlotRecipe: boolean): RecipeBase {
+    const base: RecipeBase = { properties: [] };
+    
+    if (!Node.isObjectLiteralExpression(configArg)) return base;
+    
+    const baseProp = configArg.getProperty('base');
+    if (!baseProp || !Node.isPropertyAssignment(baseProp)) return base;
+    
+    const initializer = baseProp.getInitializer();
+    if (!initializer || !Node.isObjectLiteralExpression(initializer)) return base;
+    
+    if (isSlotRecipe) {
+      // For slot recipes, process each slot
+      base.properties = this.extractSlotProperties(initializer);
+    } else {
+      // For regular recipes, direct style extraction
+      base.properties = this.extractProperties(initializer);
+    }
+    
+    return base;
+  }
+  
+  private extractVariants(configArg: Node, isSlotRecipe: boolean): Record<string, RecipeVariant[]> {
+    const variants: Record<string, RecipeVariant[]> = {};
+    
+    if (!Node.isObjectLiteralExpression(configArg)) return variants;
+    
+    const variantsProp = configArg.getProperty('variants');
+    if (!variantsProp || !Node.isPropertyAssignment(variantsProp)) return variants;
+    
+    const initializer = variantsProp.getInitializer();
+    if (!initializer || !Node.isObjectLiteralExpression(initializer)) return variants;
+    
+    // Process each variant group (e.g., size, color)
+    initializer.getProperties().forEach(prop => {
+      if (!Node.isPropertyAssignment(prop)) return;
+      
+      const variantGroupName = prop.getName();
+      const variantGroupValue = prop.getInitializer();
+      if (!variantGroupValue || !Node.isObjectLiteralExpression(variantGroupValue)) return;
+      
+      // Process each variant value (e.g., sm, md, lg)
+      const variantValues = this.processVariantValues(variantGroupValue, isSlotRecipe);
+      if (variantValues.length > 0) {
+        variants[variantGroupName] = variantValues;
+      }
+    });
+    
+    return variants;
+  }
+  
+  private processVariantValues(variantGroupValue: Node, isSlotRecipe: boolean): RecipeVariant[] {
+    if (!Node.isObjectLiteralExpression(variantGroupValue)) return [];
+    
+    return variantGroupValue.getProperties()
+      .filter(Node.isPropertyAssignment)
+      .map(variantProp => {
+        const variantName = variantProp.getName();
+        const variantValue = variantProp.getInitializer();
+        
+        if (!variantValue || !Node.isObjectLiteralExpression(variantValue)) {
+          return null;
+        }
+        
+        const properties = isSlotRecipe 
+          ? this.extractSlotProperties(variantValue)
+          : this.extractProperties(variantValue);
+          
+        if (properties.length === 0) {
+          return null;
+        }
+        
+        return {
+          name: variantName,
+          properties
+        };
+      })
+      .filter((variant): variant is RecipeVariant => variant !== null);
+  }
+  
+  private extractSlotProperties(obj: Node): RecipeProperty[] {
+    if (!Node.isObjectLiteralExpression(obj)) return [];
+    
+    // Flatten the slot structure
+    return obj.getProperties()
+      .filter(Node.isPropertyAssignment)
+      .flatMap(slotProp => {
+        const slotName = slotProp.getName();
+        const slotValue = slotProp.getInitializer();
+        
+        if (!slotValue || !Node.isObjectLiteralExpression(slotValue)) {
+          return [];
+        }
+        
+        // Extract properties for this slot
+        const properties = this.extractProperties(slotValue);
+        
+        // Add slot information to each property
+        return properties.map(prop => ({
+          ...prop,
+          slot: slotName
+        }));
+      });
   }
   
   private findRecipeNameFromParent(callExpression: Node): string {
-    // Try to find the parent variable declaration to get the name
     let parent = callExpression.getParent();
     
     while (parent) {
-      // Check for variable declaration (const button = defineRecipe(...))
+      // Check for variable declaration
       if (Node.isVariableDeclaration(parent)) {
         return parent.getName();
       }
       
-      // Check for property assignment (export = { button: defineRecipe(...) })
+      // Check for property assignment
       if (Node.isPropertyAssignment(parent)) {
         return parent.getName();
       }
@@ -176,71 +256,70 @@ export class RecipeParser {
   }
   
   private extractProperties(obj: Node): RecipeProperty[] {
-    const properties: RecipeProperty[] = []
+    if (!Node.isObjectLiteralExpression(obj)) return [];
     
-    if (Node.isObjectLiteralExpression(obj)) {
-      obj.getProperties().forEach(prop => {
-        if (Node.isPropertyAssignment(prop)) {
-          const propName = prop.getName()
-          const initializer = prop.getInitializer()
+    return obj.getProperties()
+      .filter(Node.isPropertyAssignment)
+      .flatMap(prop => {
+        const propName = prop.getName();
+        const initializer = prop.getInitializer();
+        
+        if (!initializer) return [];
+        
+        // Handle string or numeric literals
+        if (Node.isStringLiteral(initializer) || Node.isNumericLiteral(initializer)) {
+          return [{
+            propName,
+            propValue: Node.isStringLiteral(initializer) 
+              ? initializer.getLiteralValue() 
+              : initializer.getText(),
+            range: this.createRangeFromNode(initializer)
+          }];
+        } 
+        
+        // Handle nested objects
+        if (Node.isObjectLiteralExpression(initializer)) {
+          const nestedProps = this.extractProperties(initializer);
           
-          if (initializer) {
-            // For string literals we capture the value and position
-            if (Node.isStringLiteral(initializer) || Node.isNumericLiteral(initializer)) {
-              // Create range from node position
-              const sourceFile = initializer.getSourceFile();
-              const start = initializer.getPos();
-              const end = initializer.getEnd();
-              
-              const startLineAndChar = sourceFile.getLineAndColumnAtPos(start);
-              const endLineAndChar = sourceFile.getLineAndColumnAtPos(end);
-              
-              const range = Range.create(
-                { 
-                  line: startLineAndChar.line - 1, 
-                  character: startLineAndChar.column - 1
-                },
-                { 
-                  line: endLineAndChar.line - 1, 
-                  character: endLineAndChar.column - 1
-                }
-              );
-              
-              properties.push({
-                propName,
-                propValue: Node.isStringLiteral(initializer) 
-                  ? initializer.getLiteralValue() 
-                  : initializer.getText(),
-                range
-              })
-            } 
-            // For nested objects recursively extract properties
-            else if (Node.isObjectLiteralExpression(initializer)) {
-              const nestedProps = this.extractProperties(initializer)
-              // Prefix the nested property names with the parent property name
-              nestedProps.forEach(nestedProp => {
-                properties.push({
-                  propName: `${propName}.${nestedProp.propName}`,
-                  propValue: nestedProp.propValue,
-                  range: nestedProp.range
-                })
-              })
-            }
-          }
+          // Prefix the nested property names with the parent property name
+          return nestedProps.map(nestedProp => ({
+            propName: `${propName}.${nestedProp.propName}`,
+            propValue: nestedProp.propValue,
+            range: nestedProp.range
+          }));
         }
-      })
-    }
+        
+        return [];
+      });
+  }
+  
+  private createRangeFromNode(node: Node): Range {
+    const sourceFile = node.getSourceFile();
+    const start = node.getPos();
+    const end = node.getEnd();
     
-    return properties
+    const startLineAndChar = sourceFile.getLineAndColumnAtPos(start);
+    const endLineAndChar = sourceFile.getLineAndColumnAtPos(end);
+    
+    return Range.create(
+      { 
+        line: startLineAndChar.line - 1, 
+        character: startLineAndChar.column - 1
+      },
+      { 
+        line: endLineAndChar.line - 1, 
+        character: endLineAndChar.column - 1
+      }
+    );
   }
   
   parseDocument(doc: TextDocument): RecipeDefinition[] {
-    const ctx = this.getContext()
-    if (!ctx) return []
+    const ctx = this.getContext();
+    if (!ctx) return [];
     
-    const sourceFile = ctx.project.getSourceFile(doc.uri) as SourceFile | undefined
-    if (!sourceFile) return []
+    const sourceFile = ctx.project.getSourceFile(doc.uri) as SourceFile | undefined;
+    if (!sourceFile) return [];
     
-    return this.parseSourceFile(sourceFile)
+    return this.parseSourceFile(sourceFile);
   }
 } 

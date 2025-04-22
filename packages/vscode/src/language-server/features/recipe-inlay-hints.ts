@@ -1,9 +1,12 @@
 import { InlayHint, InlayHintKind } from 'vscode-languageserver'
 import { printTokenValue } from '../tokens/utils'
 import type { PandaLanguageServer } from '../panda-language-server'
-import { RecipeParser } from '../recipe-parser'
+import { RecipeParser, type RecipeProperty } from '../recipe-parser'
 import { getTokenFromPropValue } from '../tokens/get-token'
 import { TextDocument } from 'vscode-languageserver-textdocument'
+import type { PandaContext } from '@pandacss/node'
+import type { PandaVSCodeSettings } from '@pandacss/extension-shared'
+import type { Token } from '@pandacss/token-dictionary'
 
 /**
  * Gets recipe inlay hints for a document
@@ -30,48 +33,56 @@ export async function getRecipeInlayHints(
     return []
   }
   
-  const inlayHints = [] as InlayHint[]
-  
-  // Process each recipe
-  recipes.forEach(recipe => {
+  // Create and return inlay hints
+  return recipes.flatMap(recipe => [
     // Process base properties
-    recipe.base.properties.forEach(prop => {
-      const token = getTokenFromPropValue(ctx, prop.propName, String(prop.propValue))
-      if (token && 
-          token.extensions.kind !== 'color' &&
-          token.extensions.kind !== 'semantic-color' &&
-          token.extensions.kind !== 'native-color' &&
-          token.extensions.kind !== 'invalid-token-path') {
-        inlayHints.push({
-          position: prop.range.end,
-          label: printTokenValue(token, settings),
-          kind: InlayHintKind.Type,
-          paddingLeft: true,
-        })
-      }
-    })
+    ...createHints(recipe.base.properties, ctx, settings),
     
-    // Process variant properties
-    Object.values(recipe.variants).forEach(variantGroup => {
-      variantGroup.forEach(variant => {
-        variant.properties.forEach(prop => {
-          const token = getTokenFromPropValue(ctx, prop.propName, String(prop.propValue))
-          if (token && 
-              token.extensions.kind !== 'color' &&
-              token.extensions.kind !== 'semantic-color' &&
-              token.extensions.kind !== 'native-color' && 
-              token.extensions.kind !== 'invalid-token-path') {
-            inlayHints.push({
-              position: prop.range.end,
-              label: printTokenValue(token, settings),
-              kind: InlayHintKind.Type,
-              paddingLeft: true,
-            })
-          }
-        })
-      })
+    // Process variant properties (flatMap all variant groups and their values)
+    ...Object.values(recipe.variants)
+      .flatMap(variantGroup => 
+        variantGroup.flatMap(variant => 
+          createHints(variant.properties, ctx, settings)
+        )
+      )
+  ]);
+}
+
+/**
+ * Helper function to create inlay hints from recipe properties
+ */
+function createHints(
+  properties: RecipeProperty[], 
+  ctx: PandaContext, 
+  settings: PandaVSCodeSettings
+): InlayHint[] {
+  return properties
+    .map(prop => {
+      const token = getTokenFromPropValue(ctx, prop.propName, String(prop.propValue))
+      
+      if (!token || !isValidTokenForHint(token)) {
+        return null
+      }
+      
+      // Create label with slot information if available
+      const label = printTokenValue(token, settings)
+        
+      return {
+        position: prop.range.end,
+        label,
+        kind: InlayHintKind.Type,
+        paddingLeft: true,
+      } as InlayHint
     })
-  })
-  
-  return inlayHints
+    .filter((hint): hint is InlayHint => hint !== null)
+}
+
+/**
+ * Check if the token is valid for showing an inlay hint
+ */
+function isValidTokenForHint(token: Token): boolean {
+  return token.extensions.kind !== 'color' &&
+         token.extensions.kind !== 'semantic-color' &&
+         token.extensions.kind !== 'native-color' &&
+         token.extensions.kind !== 'invalid-token-path'
 } 
