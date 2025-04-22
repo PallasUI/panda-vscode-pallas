@@ -4,9 +4,9 @@
   "name": "panda-css-pallasui",
   "displayName": "🐼 Panda CSS (PallasUI)",
   "description": "Fork of the Panda CSS plugin for VS Code",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "engines": {
-    "vscode": "^1.67.0"
+    "vscode": "^1.96.1"
   },
   "categories": [
     "Programming Languages",
@@ -196,16 +196,16 @@
   },
   "scripts": {
     "build:all": "yarn workspaces foreach -R run build",
-    "build": "NODE_OPTIONS='--no-warnings' tsup",
-    "dev": "NODE_OPTIONS='--no-warnings' tsup --watch --sourcemap src/index.ts --watch --sourcemap src/server.ts --watch ../shared/dist/index.js --watch ../ts-plugin/dist/index.js",
-    "dev:watch": "NODE_OPTIONS='--no-warnings' tsup --config tsup.config.dev.ts",
+    "build": "tsup",
+    "dev": "tsup --watch --sourcemap src/index.ts --watch --sourcemap src/server.ts --watch ../shared/dist/index.js --watch ../ts-plugin/dist/index.js",
+    "dev:watch": "tsup --config tsup.config.dev.ts",
     "clean": "rimraf dist node_modules",
     "typecheck": "tsc --noEmit",
     "release": "NODE_OPTIONS='--no-warnings' yarn build --silent && tsx ./scripts/publish.ts",
     "release:rc": "NODE_OPTIONS='--no-warnings' yarn build --silent && VSCE_RELEASE_TYPE=rc VSCE_TARGET=standalone tsx ./scripts/publish.ts",
     "release:stable": "NODE_OPTIONS='--no-warnings' yarn build --silent && VSCE_RELEASE_TYPE=stable VSCE_TARGET=standalone tsx ./scripts/publish.ts",
     "release:dry-run": "NODE_OPTIONS='--no-warnings' yarn build --silent && VSCE_RELEASE_TYPE=dry-run VSCE_TARGET=standalone tsx ./scripts/publish.ts",
-    "pkg": "yarn vsix-builder package",
+    "pkg": "yarn vsix-builder package --dry",
     "vsix:pack": "yarn vsix-builder package -o panda-css-pallasui.vsix"
   },
   "dependencies": {
@@ -225,7 +225,26 @@
     "pathe": "1.1.2"
   },
   "bundledDependencies": [
+    "@pandacss/ts-plugin",
+    "@pandacss/dev",
+    "@pandacss/preset-base",
+    "@pandacss/preset-panda",
+    "@pandacss/node",
+    "fast-glob",
+    "ts-morph",
+    "ts-pattern",
+    "typescript",
+    "utf8",
+    "base-64",
+    "color2k",
+    "dotenv",
+    "execa",
+    "fs-extra",
     "pathe",
+    "postcss",
+    "prettier",
+    "satori",
+    "semver",
     "esbuild"
   ],
   "devDependencies": {
@@ -241,8 +260,8 @@
     "@types/prettier": "3.0.0",
     "@types/semver": "^7.5.8",
     "@types/utf8": "^3.0.3",
-    "@types/vscode": "^1.87.0",
-    "@vscode/vsce": "^2.24.0",
+    "@types/vscode": "^1.96.1",
+    "@vscode/vsce": "^3.3.2",
     "@vue/compiler-sfc": "^3.4.21",
     "base-64": "^1.0.0",
     "color2k": "^2.0.3",

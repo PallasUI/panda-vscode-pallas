@@ -51,6 +51,5 @@ export default defineConfig([
     outDir: 'dist',
     shims: true,
     sourcemap: true,
-    
   },
 ])
