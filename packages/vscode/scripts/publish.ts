@@ -66,7 +66,6 @@ switch (releaseType) {
 
   case 'stable':
     execaSync(commands.vscode_rc, { stdio: 'inherit' })
-    execaSync(commands.openvsx_publish, { stdio: 'inherit' })
     break
 
   case 'dry-run':

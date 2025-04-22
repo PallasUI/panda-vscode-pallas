@@ -142,7 +142,7 @@ export class PandaExtension {
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left)
     statusBarItem.text = '🐼 Loading...'
     statusBarItem.show()
-    statusBarItem.command = 'panda-css-vscode.open-config'
+    statusBarItem.command = 'panda-css-pallasui.open-config'
     return statusBarItem
   }
 
@@ -335,7 +335,7 @@ export class PandaExtension {
   }
 
   private registerRestartCommand() {
-    const restartCmd = vscode.commands.registerCommand('panda-css-vscode.restart', async () => {
+    const restartCmd = vscode.commands.registerCommand('panda-css-pallasui.restart', async () => {
       this.statusBarItem.text = '🐼 Restarting...'
       this.statusBarItem.show()
 
@@ -351,7 +351,7 @@ export class PandaExtension {
   }
 
   private registerShowOutputCommand() {
-    const showOutputCmd = vscode.commands.registerCommand('panda-css-vscode.show-output', async () => {
+    const showOutputCmd = vscode.commands.registerCommand('panda-css-pallasui.show-output', async () => {
       // Show and focus the output channel
       this.client.outputChannel.show(true)
     })
@@ -360,7 +360,7 @@ export class PandaExtension {
   }
 
   private registerOpenConfigCommand() {
-    const openConfigCmd = vscode.commands.registerCommand('panda-css-vscode.open-config', async () => {
+    const openConfigCmd = vscode.commands.registerCommand('panda-css-pallasui.open-config', async () => {
       const configPath = await this.client.sendRequest<string>('$/get-config-path')
       if (!configPath) return
 

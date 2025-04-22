@@ -1,11 +1,10 @@
 {
-  "publisher": "chakra-ui",
+  "publisher": "PallasUI",
   "packageManager": "yarn@4.0.1",
-  "name": "panda-css-vscode",
-  "displayName": "🐼 Panda CSS",
-  "description": "The official Panda CSS plugin for VS Code",
-  "version": "0.3.1",
-  "private": true,
+  "name": "panda-css-pallasui",
+  "displayName": "🐼 Panda CSS (PallasUI)",
+  "description": "Fork of the Panda CSS plugin for VS Code",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.67.0"
   },
@@ -44,17 +43,17 @@
   "contributes": {
     "commands": [
       {
-        "command": "panda-css-vscode.restart",
+        "command": "panda-css-pallasui.restart",
         "title": "Restart Panda Server",
         "category": "Panda"
       },
       {
-        "command": "panda-css-vscode.show-output",
+        "command": "panda-css-pallasui.show-output",
         "title": "Show panda output",
         "category": "Panda"
       },
       {
-        "command": "panda-css-vscode.open-config",
+        "command": "panda-css-pallasui.open-config",
         "title": "Open current panda config",
         "category": "Panda"
       }
@@ -192,7 +191,7 @@
     ]
   },
   "repository": {
-    "url": "https://github.com/chakra-ui/panda-vscode",
+    "url": "https://github.com/PallasUI/panda-vscode-pallas",
     "directory": "packages/vscode"
   },
   "scripts": {
@@ -203,7 +202,11 @@
     "clean": "rimraf dist node_modules",
     "typecheck": "tsc --noEmit",
     "release": "NODE_OPTIONS='--no-warnings' yarn build --silent && tsx ./scripts/publish.ts",
-    "pkg": "yarn vsix-builder package"
+    "release:rc": "NODE_OPTIONS='--no-warnings' yarn build --silent && VSCE_RELEASE_TYPE=rc VSCE_TARGET=standalone tsx ./scripts/publish.ts",
+    "release:stable": "NODE_OPTIONS='--no-warnings' yarn build --silent && VSCE_RELEASE_TYPE=stable VSCE_TARGET=standalone tsx ./scripts/publish.ts",
+    "release:dry-run": "NODE_OPTIONS='--no-warnings' yarn build --silent && VSCE_RELEASE_TYPE=dry-run VSCE_TARGET=standalone tsx ./scripts/publish.ts",
+    "pkg": "yarn vsix-builder package",
+    "vsix:pack": "yarn vsix-builder package -o panda-css-pallasui.vsix"
   },
   "dependencies": {
     "@pandacss/core": "^0.53.4",
