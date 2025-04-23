@@ -8,10 +8,12 @@ const aliases = {
 
 const nodeModulesPath = path.resolve(__dirname, 'node_modules')
 
+
+
 export default defineConfig([
   // Extension entry point
   {
-    entry: ['src/index.ts'],
+    entry: ['src/index.ts', 'src/server.ts'],
     format: ['cjs'],
     external: ['vscode', 'esbuild', 'lightningcss'],
     minify: false,
@@ -31,25 +33,14 @@ export default defineConfig([
             for (const alias in aliases) {
               if (args.path.startsWith(alias)) {
                 const updated = path.resolve(nodeModulesPath, aliases[alias as keyof typeof aliases])
-
+    
                 return { path: updated }
               }
-            }
+            } 
             return null
           })
         },
       },
-    ],
-  },
-  // Server entry point
-  {
-    entry: ['src/server.ts'],
-    format: ['cjs'],
-    external: ['vscode', 'esbuild', 'lightningcss'],
-    minify: false,
-    outDir: 'dist',
-    shims: true,
-    sourcemap: true,
-    watch: true,
+    ]
   },
 ]) 

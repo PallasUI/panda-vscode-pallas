@@ -20,6 +20,9 @@
       ],
       "outFiles": ["${workspaceFolder}/packages"],
       "sourceMaps": true,
+      "env": {
+        "TSS_DEBUG": "7099"
+      }
     },
     // See: https://github.com/microsoft/TypeScript/wiki/Debugging-Language-Service-in-VS-Code
     {

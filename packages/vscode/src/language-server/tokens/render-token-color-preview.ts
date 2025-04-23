@@ -73,7 +73,8 @@ export const renderTokenColorPreview = async (ctx: PandaContext, token: Token) =
 const reolveTokenBaseValue = (ctx: PandaContext, token: Token): {base: string, refrence: string, formatted: string, isConditional: boolean} =>  {
   if (token.extensions?.conditions?.base) {
     const baseValue = token.extensions.conditions.base
-    const resolvedValue = ctx.tokens.deepResolveReference(baseValue)
+    const valueToResolve = token.isReference ? token.originalValue : baseValue;
+    const resolvedValue = ctx.tokens.deepResolveReference(valueToResolve);
     if (resolvedValue) {
       const formatted = `${resolvedValue} ↔ ${baseValue}`
       return {base: resolvedValue, refrence: baseValue, formatted, isConditional: true}

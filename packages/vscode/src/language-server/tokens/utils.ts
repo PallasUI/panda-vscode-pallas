@@ -73,14 +73,10 @@ export const printTokenValue = (token: Token, settings: PandaVSCodeSettings) =>
 export const printTokenValueHover = (ctx: PandaContext, token: Token, settings: PandaVSCodeSettings) => {
   let value = token.value
   if (token.extensions?.conditions?.base) {
-    const [tokenRefBase] = ctx.tokens.getReferences(token.extensions.conditions.base)
-    const tokenRefOriginal = ctx.tokens.deepResolveReference(token.originalValue)
-    if (tokenRefBase) {
-      value = tokenRefBase.value
-    }
-    if (tokenRefOriginal) {
-      value = tokenRefOriginal
-    }
+    const baseValue = token.extensions.conditions.base
+    const valueToResolve = token.isReference ? token.originalValue : baseValue;
+    const resolvedValue = ctx.tokens.deepResolveReference(valueToResolve);
+    value = resolvedValue
   }
   return `${value}${settings['rem-to-px.enabled'] && value.endsWith('rem') ? ` (${toPx(value)})` : ''}`
 }

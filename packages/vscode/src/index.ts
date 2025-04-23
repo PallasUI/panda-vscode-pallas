@@ -8,7 +8,7 @@ let client: LanguageClient | undefined
 export async function activate(context: vscode.ExtensionContext) {
   debug && console.log('activate')
 
-  const extension = new PandaExtension(context, false)
+  const extension = new PandaExtension(context, true)
   await extension.connectToTsPlugin()
   await extension.start()
   client = extension.client

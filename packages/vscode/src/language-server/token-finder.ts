@@ -40,7 +40,7 @@ export class TokenFinder {
     this.project.getFileTokens(parserResult, ({ propName, propValue, shorthand, propNode }) => {
       const token = getTokenFromPropValue(ctx, propName, String(propValue))
       if (!token) return
-
+      
       const range = nodeRangeToVsCodeRange(propNode.getRange())
       onToken?.({ kind: 'token', token, range, propName, propValue, propNode, shorthand })
     })

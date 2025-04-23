@@ -37,10 +37,11 @@ export function registerColorHints(lsp: PandaLanguageServer) {
             if (settings['color-hints.semantic-tokens.enabled']) {
               Object.entries(match.token.extensions.conditions).forEach(([cond, value]) => {
                 if (!ctx.conditions.get(cond) && cond !== 'base') return
-                const [tokenRef] = ctx.tokens.getReferences(value)
-                if (!tokenRef) return
-
-                const color = color2kToVsCodeColor(tokenRef.value)
+                if(cond !== 'base') return
+                const valueToResolve = match.token.isReference ? match.token.originalValue : value;
+                const resolvedValue = ctx.tokens.deepResolveReference(valueToResolve);
+                if (!resolvedValue) return
+                const color = color2kToVsCodeColor(resolvedValue)
                 if (!color) return
 
                 colors.push({ color, range: match.range as any })

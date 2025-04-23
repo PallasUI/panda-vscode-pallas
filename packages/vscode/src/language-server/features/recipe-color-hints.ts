@@ -6,7 +6,6 @@ import { getTokenFromPropValue } from '../tokens/get-token'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import type { PandaContext } from '@pandacss/node'
 import type { Token } from '@pandacss/token-dictionary'
-import { parseToRgba } from 'color2k'
 
 /**
  * Gets color hints for recipes in a document
@@ -51,7 +50,7 @@ export async function getRecipeColorHints(
 /**
  * Helper function to create color hints from recipe properties
  */
-function createColorHints(
+export function createColorHints(
   properties: RecipeProperty[],
   ctx: PandaContext,
   settings: any
@@ -82,7 +81,7 @@ function createColorHints(
 /**
  * Process a semantic token to extract color information
  */
-function processSemanticToken(
+export function processSemanticToken(
   token: Token, 
   prop: RecipeProperty, 
   ctx: PandaContext
@@ -97,15 +96,13 @@ function processSemanticToken(
     // Skip conditions that don't exist (except base)
     if (cond !== 'base' && !ctx.conditions.get(cond)) return;
     if(cond !== 'base') return
-    const resolvedValue = ctx.tokens.deepResolveReference(value)
     
+    const valueToResolve = token.isReference ? token.originalValue : value;
+    const resolvedValue = ctx.tokens.deepResolveReference(valueToResolve);
     // Try to get the actual color value
     try {
       // For direct color values
-      if (resolvedValue && typeof resolvedValue === 'string') {
-        // Try parsing as color
-        parseToRgba(resolvedValue);
-        
+      if (resolvedValue && typeof resolvedValue === 'string') { 
         // If we reach here, it's a valid color
         const color = color2kToVsCodeColor(resolvedValue);
         if (color) {
