@@ -22,6 +22,7 @@ import { registerDiagnostics } from './features/diagnostics'
 import { registerHover } from './features/hover'
 import { registerInlayHints } from './features/inlay-hints'
 import { Deferred } from './deferred'
+import { RecipeParserCache } from './recipe-parser-cache'
 
 export type GetContext = () => Builder['context'] | undefined
 interface InitializationOptions {
@@ -54,6 +55,7 @@ export class PandaLanguageServer {
   hasWorkspaceFolderCapability = false
   //
   events = new Map<string, Set<Function>>()
+  recipeParserCache: RecipeParserCache
 
   constructor(private debug: boolean = false) {
     // Create a connection for the server, using Node's IPC as a transport.
@@ -71,6 +73,9 @@ export class PandaLanguageServer {
       this.project,
       this.tokenFinder,
     )
+    
+    // Initialize the recipe parser cache
+    this.recipeParserCache = new RecipeParserCache(getContext)
 
     this.builderResolver = new BuilderResolver(({ configPath, builder }) => {
       const ctx = builder.context
@@ -78,6 +83,9 @@ export class PandaLanguageServer {
 
       console.log('🐼 Context reloaded for:', configPath)
       this.context = ctx
+      
+      // Invalidate recipe cache when context reloads
+      this.recipeParserCache.invalidateAllCaches()
 
       // sync ts plugin possible completion items
       const tokenNames = Array.from(new Set(ctx.tokens.allTokens.map((token) => token.path.slice(1).join('.'))))
@@ -221,6 +229,7 @@ export class PandaLanguageServer {
     this.onActivePandaConfigChanged()
     this.onDidChangedSettings()
     this.onDidChangePandaConfigs()
+    this.onDocumentEvents()
   }
 
   private onInitializingConnection() {
@@ -330,14 +339,32 @@ export class PandaLanguageServer {
   }
 
   private onActivePandaConfigChanged() {
-    this.connection.onRequest('$/get-config-path', ({ activeDocumentFilepath }: { activeDocumentFilepath: string }) => {
-      activeDocumentFilepath ??= this.activeDocumentFilepath
-      if (!activeDocumentFilepath) return
+    this.connection.onNotification('$/panda-active-config-changed', async (params) => {
+      console.log('🤖 Active config changed: ', params)
+      const config = {
+        filepath: params.filepath,
+        dirname: params.dirname,
+      }
 
-      return this.builderResolver.findConfigDirpath(activeDocumentFilepath, (_, configPath) => {
-        console.log('config path', configPath)
-        return configPath
-      })
+      //
+      if (this.activeDocumentFilepath) {
+        console.log('📄 Active document:', this.activeDocumentFilepath)
+        
+        // Create builder for this config path if it doesn't exist
+        this.builderResolver.create(config.filepath)
+        
+        // Setup the builder for this filepath
+        await this.builderResolver.setup(this.activeDocumentFilepath)
+        
+        // Get the builder context
+        const builder = this.builderResolver.get(this.activeDocumentFilepath)
+        if (builder && builder.context) {
+          this.context = builder.context
+          
+          // Invalidate all recipe parser caches when context changes
+          this.recipeParserCache.invalidateAllCaches()
+        }
+      }
     })
   }
 
@@ -395,6 +422,18 @@ export class PandaLanguageServer {
       // Update all opened documents diagnostics
       const docs = this.documents.all()
       docs.forEach((doc) => updateDocumentDiagnostics(doc))
+    })
+  }
+
+  private onDocumentEvents() {
+    // Invalidate cache when document changes
+    this.documents.onDidChangeContent((params) => {
+      this.recipeParserCache.invalidateCache(params.document.uri)
+    })
+    
+    // Invalidate cache when document is closed
+    this.documents.onDidClose((params) => {
+      this.recipeParserCache.invalidateCache(params.document.uri)
     })
   }
 

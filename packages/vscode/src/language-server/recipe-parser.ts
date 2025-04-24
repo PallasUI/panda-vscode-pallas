@@ -1,5 +1,5 @@
 import { Range } from 'vscode-languageserver'
-import { Node, SourceFile } from 'ts-morph'
+import { Node, SourceFile, SyntaxKind } from 'ts-morph'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import type { PandaContext } from '@pandacss/node'
 
@@ -41,31 +41,39 @@ export class RecipeParser {
   }
   
   private findRecipeNodes(sourceFile: SourceFile): {node: Node, isSlotRecipe: boolean}[] {
-    const recipeNodes: {node: Node, isSlotRecipe: boolean}[] = [];
-    
-    sourceFile.forEachDescendant(node => {
-      if (!Node.isCallExpression(node)) return;
-      
-      const expression = node.getExpression();
-      if (!Node.isIdentifier(expression)) return;
-      
-      const fnName = expression.getText();
-      if (fnName !== 'defineRecipe' && fnName !== 'defineSlotRecipe') return;
-      
-      recipeNodes.push({
-        node,
-        isSlotRecipe: fnName === 'defineSlotRecipe'
+    return sourceFile
+      .getDescendantsOfKind(SyntaxKind.CallExpression)
+      .filter(node => {
+        const expression = node.getExpression();
+        if (!Node.isIdentifier(expression)) return false;
+        
+        const fnName = expression.getText();
+        return fnName === 'defineRecipe' || fnName === 'defineSlotRecipe';
+      })
+      .map(node => {
+        const expression = node.getExpression();
+        return {
+          node,
+          isSlotRecipe: Node.isIdentifier(expression) && expression.getText() === 'defineSlotRecipe'
+        };
       });
-    });
-    
-    return recipeNodes;
+  }
+  
+  // Type guard utility to reduce repeated code
+  private isPropertyWithObjectValue(prop: Node | undefined): prop is Node & { 
+    getName(): string;
+    getInitializer(): Node & { getProperties(): Node[] } 
+  } {
+    return !!prop && 
+           Node.isPropertyAssignment(prop) && 
+           !!prop.getInitializer() && 
+           Node.isObjectLiteralExpression(prop.getInitializer());
   }
   
   private extractRecipeDefinition(
     callExpression: Node, 
     isSlotRecipe: boolean
   ): RecipeDefinition | undefined {
-    if (!Node.isCallExpression(callExpression)) return undefined;
     
     const configArg = this.getConfigArgument(callExpression);
     if (!configArg) return undefined;
@@ -99,21 +107,36 @@ export class RecipeParser {
   
   private extractRecipeName(callExpression: Node, configArg: Node): string {
     // Try to find name from parent variable declaration or export
-    const name = this.findRecipeNameFromParent(callExpression);
-    if (name) return name;
+    let parent = callExpression.getParent();
+    let name = '';
     
-    // Try to find from className property
-    if (Node.isObjectLiteralExpression(configArg)) {
+    // Find name from variable declaration or property assignment
+    while (parent && !name) {
+      if (Node.isVariableDeclaration(parent)) {
+        name = parent.getName();
+        break;
+      }
+      
+      if (Node.isPropertyAssignment(parent)) {
+        name = parent.getName();
+        break;
+      }
+      
+      parent = parent.getParent();
+    }
+    
+    // If no name found, try to find from className property
+    if (!name && Node.isObjectLiteralExpression(configArg)) {
       const classNameProp = configArg.getProperty('className');
       if (classNameProp && Node.isPropertyAssignment(classNameProp)) {
         const initializer = classNameProp.getInitializer();
         if (initializer && Node.isStringLiteral(initializer)) {
-          return initializer.getLiteralValue();
+          name = initializer.getLiteralValue();
         }
       }
     }
     
-    return '';
+    return name;
   }
   
   private extractSlots(configArg: Node): string[] {
@@ -136,18 +159,14 @@ export class RecipeParser {
     if (!Node.isObjectLiteralExpression(configArg)) return base;
     
     const baseProp = configArg.getProperty('base');
-    if (!baseProp || !Node.isPropertyAssignment(baseProp)) return base;
+    if (!Node.isPropertyAssignment(baseProp)) return base;
     
     const initializer = baseProp.getInitializer();
     if (!initializer || !Node.isObjectLiteralExpression(initializer)) return base;
     
-    if (isSlotRecipe) {
-      // For slot recipes, process each slot
-      base.properties = this.extractSlotProperties(initializer);
-    } else {
-      // For regular recipes, direct style extraction
-      base.properties = this.extractProperties(initializer);
-    }
+    base.properties = isSlotRecipe
+      ? this.extractSlotProperties(initializer)
+      : this.extractProperties(initializer);
     
     return base;
   }
@@ -158,20 +177,22 @@ export class RecipeParser {
     if (!Node.isObjectLiteralExpression(configArg)) return variants;
     
     const variantsProp = configArg.getProperty('variants');
-    if (!variantsProp || !Node.isPropertyAssignment(variantsProp)) return variants;
+    if (!Node.isPropertyAssignment(variantsProp)) return variants;
     
     const initializer = variantsProp.getInitializer();
     if (!initializer || !Node.isObjectLiteralExpression(initializer)) return variants;
     
-    // Process each variant group (e.g., size, color)
-    initializer.getProperties().forEach(prop => {
-      if (!Node.isPropertyAssignment(prop)) return;
-      
+    // Get all properties that are property assignments
+    const variantGroups = initializer.getProperties()
+      .filter(Node.isPropertyAssignment);
+    
+    // Process each variant group in a functional way
+    variantGroups.forEach(prop => {
       const variantGroupName = prop.getName();
       const variantGroupValue = prop.getInitializer();
+      
       if (!variantGroupValue || !Node.isObjectLiteralExpression(variantGroupValue)) return;
       
-      // Process each variant value (e.g., sm, md, lg)
       const variantValues = this.processVariantValues(variantGroupValue, isSlotRecipe);
       if (variantValues.length > 0) {
         variants[variantGroupName] = variantValues;
@@ -190,22 +211,13 @@ export class RecipeParser {
         const variantName = variantProp.getName();
         const variantValue = variantProp.getInitializer();
         
-        if (!variantValue || !Node.isObjectLiteralExpression(variantValue)) {
-          return null;
-        }
+        if (!variantValue || !Node.isObjectLiteralExpression(variantValue)) return null;
         
         const properties = isSlotRecipe 
           ? this.extractSlotProperties(variantValue)
           : this.extractProperties(variantValue);
           
-        if (properties.length === 0) {
-          return null;
-        }
-        
-        return {
-          name: variantName,
-          properties
-        };
+        return properties.length === 0 ? null : { name: variantName, properties };
       })
       .filter((variant): variant is RecipeVariant => variant !== null);
   }
@@ -213,46 +225,18 @@ export class RecipeParser {
   private extractSlotProperties(obj: Node): RecipeProperty[] {
     if (!Node.isObjectLiteralExpression(obj)) return [];
     
-    // Flatten the slot structure
     return obj.getProperties()
       .filter(Node.isPropertyAssignment)
       .flatMap(slotProp => {
         const slotName = slotProp.getName();
         const slotValue = slotProp.getInitializer();
         
-        if (!slotValue || !Node.isObjectLiteralExpression(slotValue)) {
-          return [];
-        }
+        if (!slotValue || !Node.isObjectLiteralExpression(slotValue)) return [];
         
-        // Extract properties for this slot
-        const properties = this.extractProperties(slotValue);
-        
-        // Add slot information to each property
-        return properties.map(prop => ({
-          ...prop,
-          slot: slotName
-        }));
+        // Extract properties for this slot and add slot information
+        return this.extractProperties(slotValue)
+          .map(prop => ({ ...prop, slot: slotName }));
       });
-  }
-  
-  private findRecipeNameFromParent(callExpression: Node): string {
-    let parent = callExpression.getParent();
-    
-    while (parent) {
-      // Check for variable declaration
-      if (Node.isVariableDeclaration(parent)) {
-        return parent.getName();
-      }
-      
-      // Check for property assignment
-      if (Node.isPropertyAssignment(parent)) {
-        return parent.getName();
-      }
-      
-      parent = parent.getParent();
-    }
-    
-    return '';
   }
   
   private extractProperties(obj: Node): RecipeProperty[] {
@@ -279,13 +263,12 @@ export class RecipeParser {
         
         // Handle nested objects
         if (Node.isObjectLiteralExpression(initializer)) {
-          const nestedProps = this.extractProperties(initializer);
-          // Prefix the nested property names with the parent property name
-          return nestedProps.map(nestedProp => ({
-            propName: `${nestedProp.propName}`,
-            propValue: nestedProp.propValue,
-            range: nestedProp.range
-          }));
+          return this.extractProperties(initializer)
+            .map(nestedProp => ({
+              propName: nestedProp.propName,
+              propValue: nestedProp.propValue,
+              range: nestedProp.range
+            }));
         }
         
         return [];
@@ -317,7 +300,7 @@ export class RecipeParser {
     if (!ctx) return [];
     
     const sourceFile = ctx.project.getSourceFile(doc.uri) as SourceFile | undefined;
-    if (!sourceFile) return [];
+    if (!sourceFile || sourceFile.getFullText().trim() === '') return [];
     
     return this.parseSourceFile(sourceFile);
   }

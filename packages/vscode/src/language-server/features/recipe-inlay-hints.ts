@@ -1,7 +1,7 @@
 import { InlayHint, InlayHintKind } from 'vscode-languageserver'
 import { printTokenValue } from '../tokens/utils'
 import type { PandaLanguageServer } from '../panda-language-server'
-import { RecipeParser, type RecipeProperty } from '../recipe-parser'
+import { type RecipeProperty } from '../recipe-parser'
 import { getTokenFromPropValue } from '../tokens/get-token'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import type { PandaContext } from '@pandacss/node'
@@ -22,11 +22,8 @@ export async function getRecipeInlayHints(
   const ctx = lsp.getContext()
   if (!ctx) return []
   
-  // Create recipe parser
-  const recipeParser = new RecipeParser(lsp.getContext)
-  
-  // Parse recipes from the document
-  const recipes = recipeParser.parseDocument(doc)
+  // Use the cached parser from LSP instance
+  const recipes = lsp.recipeParserCache.parseDocument(doc)
   
   // No recipes found
   if (!recipes.length) {
