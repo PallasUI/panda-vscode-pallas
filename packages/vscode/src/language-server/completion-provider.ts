@@ -20,7 +20,7 @@ export class CompletionProvider {
     private getPandaSettings: () => Promise<PandaVSCodeSettings>,
     private project: ProjectHelper,
     private tokenFinder: TokenFinder,
-  ) {}
+  ) { }
 
   async getClosestCompletionList(doc: TextDocument, position: Position) {
     const ctx = this.getContext()
@@ -207,17 +207,27 @@ export const getCompletionFor = ({
   const items = [] as CompletionItem[]
   categoryValues.forEach((token, name) => {
     if (str && !name.includes(str)) return
+    if (token.extensions?.isNegative === true) return
 
     const isColor = token.extensions.category === 'colors'
 
     let insertText = name
-    if (str) {
-      const strEndsWithDot = str.endsWith('.')
-      if (strEndsWithDot) {
-        insertText = name.startsWith(str) ? name.substring(str.length) : name
+    
+    const strHasDot = str.includes('.')
+    if (strHasDot) {
+      const strParts = str.split('.')
+      const lastPart = strParts[strParts.length - 1]
+      if (lastPart === name) {
+        return
+      }
+      insertText = name.substring(str.length)
+      //append the last part of the string to the insert text
+      insertText = lastPart + '' + insertText
+      if(strHasDot && !str.endsWith('.') && isColor === true){
+        insertText = '.' + insertText
       }
     }
-
+    
     const completionItem = {
       data: { propName, token, shorthand },
       label: name,
